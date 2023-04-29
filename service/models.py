@@ -1,34 +1,32 @@
 # Create your models here.
 from datetime import datetime
 
+from django.core.validators import MaxValueValidator
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 
 class Client(models.Model):
-    client_id = models.AutoField(primary_key=True)
     first_name = models.CharField(max_length=50)
     last_name = models.CharField(max_length=50)
     email = models.CharField(max_length=100)
     phone_number = models.CharField(max_length=20)
 
     def __str__(self):
-        return f'Клієнт {self.client_id}'
+        return f'{self.first_name}'
 
 
 class PizzaSize(models.Model):
-    size_id = models.AutoField(primary_key=True)
     size_type = models.CharField(max_length=20)
     crust_type = models.CharField(max_length=20)
     price = models.FloatField()
 
     def __str__(self):
-        return f'Розмір піци {self.size_id}'
+        return f'Розмір піци {self.size_type}'
 
 
 class Pizza(models.Model):
-    pizza_id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=50)
     weight = models.IntegerField()
     description = models.CharField(max_length=200)
@@ -37,11 +35,10 @@ class Pizza(models.Model):
                                    blank=True)
 
     def __str__(self):
-        return f'Піца {self.pizza_id}'
+        return f'Піца {self.name}'
 
 
 class Order(models.Model):
-    order_id = models.AutoField(primary_key=True)
     client_order = models.ForeignKey('Client', on_delete=models.CASCADE, related_name='client_order',
                                      null=True, blank=True)
     courier_order = models.ForeignKey('Courier', on_delete=models.CASCADE, related_name='courier_order',
@@ -64,7 +61,7 @@ class Order(models.Model):
     amount = models.FloatField(default=0)
 
     def __str__(self):
-        return f'Замовлення {self.order_id}'
+        return f'Замовлення {self.id}'
 
     def save(self, *args, **kwargs):
         price = self.pizza_order.size_pizza.price
@@ -75,7 +72,6 @@ class Order(models.Model):
 
 
 class Payment(models.Model):
-    payment_id = models.AutoField(primary_key=True)
     payment_type = models.CharField(max_length=20)
     payment_date = models.DateField()
     payment_time = models.TimeField()
@@ -83,11 +79,10 @@ class Payment(models.Model):
                                       blank=True)
 
     def __str__(self):
-        return f'Оплата {self.payment_id}'
+        return f'Оплата {self.id}'
 
 
 class Courier(models.Model):
-    courier_id = models.AutoField(primary_key=True)
     first_name = models.CharField(max_length=50)
     last_name = models.CharField(max_length=50)
     email = models.CharField(max_length=100)
@@ -96,11 +91,10 @@ class Courier(models.Model):
     experience = models.IntegerField()
 
     def __str__(self):
-        return f'Курєр {self.courier_id}'
+        return f'Курєр {self.id}'
 
 
 class Chef(models.Model):
-    chef_id = models.AutoField(primary_key=True)
     first_name = models.CharField(max_length=50)
     last_name = models.CharField(max_length=50)
     salary = models.FloatField()
@@ -109,11 +103,10 @@ class Chef(models.Model):
     phone_number = models.CharField(max_length=20)
 
     def __str__(self):
-        return f'Шеф {self.chef_id}'
+        return f'Шеф {self.id}'
 
 
 class Delivery(models.Model):
-    delivery_id = models.AutoField(primary_key=True)
     delivery_date = models.DateField()
     delivery_time = models.TimeField()
     delivery_comment = models.CharField(max_length=200)
@@ -121,24 +114,22 @@ class Delivery(models.Model):
                                          null=True, blank=True)
 
     def __str__(self):
-        return f'Доставка {self.delivery_id}'
+        return f'Доставка {self.id}'
 
 
 class Feedback(models.Model):
-    feedback_id = models.AutoField(primary_key=True)
     feedback_text = models.CharField(max_length=200)
-    rating = models.IntegerField()
+    rating = models.IntegerField(validators=[MaxValueValidator(5)])
     feedback_date = models.DateField()
     feedback_time = models.TimeField()
     client_feedback = models.ForeignKey('Client', on_delete=models.CASCADE, related_name='client_feedback', null=True,
                                         blank=True)
 
     def __str__(self):
-        return f'Відгук {self.feedback_id}'
+        return f'Відгук {self.id}'
 
 
 class Promo(models.Model):
-    promo_id = models.AutoField(primary_key=True)
     promo_name = models.CharField(max_length=50)
     discount = models.FloatField()
     valid_term = models.IntegerField(default=1)
@@ -146,38 +137,38 @@ class Promo(models.Model):
                                    blank=True)
 
     def __str__(self):
-        return f'Промокод {self.promo_id}'
+        return f'Промокод {self.id}'
 
     def save(self, *args, **kwargs):
         end = datetime.strptime(str(self.promo_date.end_date), "%Y-%m-%d")
         start = datetime.strptime(str(self.promo_date.start_date), "%Y-%m-%d")
         delta = end - start
-        self.valid_term = delta.days
+        self.valid_term = max(delta.days, 1)
         return super().save(*args, **kwargs)
 
 
 class PromoDate(models.Model):
-    promodate_id = models.AutoField(primary_key=True)
     start_date = models.DateField()
     end_date = models.DateField()
     discount_type = models.CharField(max_length=20)
 
     def __str__(self):
-        return f'Номер промокоду {self.promodate_id}'
+        return f'Номер промокоду {self.id}'
 
     def save(self, *args, **kwargs):
-        promo_list = list(self.promo_date.all().values_list('promo_id', flat=True))
+        super().save(*args, **kwargs)
+        promo_list = list(self.promo_date.all().values_list('id', flat=True))
         for promo_id in promo_list:
-            order = (Order.objects.filter(promo_order=promo_id))
-            if order.first():
-                print("pos")
-            else:
-                return super().save(*args, **kwargs)
-
+            order = Order.objects.filter(promo_order_id=promo_id)
+            if not order.exists():
+                promos = Promo.objects.filter(promo_date=self)
+                duration = self.end_date - self.start_date
+                promos.update(valid_term=max(duration.days, 1))
+                break
 
 @receiver(post_save, sender=PromoDate)
 def update_valid_term(sender, instance, **kwargs):
-    promo_list = list(Promo.objects.filter(promo_date=instance).values_list('promo_id', flat=True))
+    promo_list = list(Promo.objects.filter(promo_date=instance).values_list('id', flat=True))
     for promo_id in promo_list:
         order = (Order.objects.filter(promo_order=promo_id))
         if order.first():
