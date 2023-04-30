@@ -16,3 +16,4 @@ def validate_past_or_current_time(value):
 
     if value_time > current_time:
         raise ValidationError("Час не може бути у майбутньому.")
+

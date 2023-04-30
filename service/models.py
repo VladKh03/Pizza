@@ -1,20 +1,33 @@
 # Create your models here.
-from datetime import datetime, timezone
+from datetime import datetime
 
-from django.core.exceptions import ValidationError
-from django.core.validators import MaxValueValidator, EmailValidator, RegexValidator
+from django.core.validators import MaxValueValidator, EmailValidator, RegexValidator, MinValueValidator
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.forms import TextInput
-from timezone_field import TimeZoneField
 
 from service.tasks import validate_past_or_today, validate_past_or_current_time
 
 
 class Client(models.Model):
-    first_name = models.CharField(max_length=50)
-    last_name = models.CharField(max_length=50)
+    first_name = models.CharField(
+        max_length=50,
+        validators=[
+            RegexValidator(
+                r'^[А-ЯІЇЄа-яіїєA-Za-z\s]+$',
+                message='Ім\'я може містити тільки українські або латинські символи.'
+            )
+        ]
+    )
+    last_name = models.CharField(
+        max_length=50,
+        validators=[
+            RegexValidator(
+                r'^[А-ЯІЇЄа-яіїєA-Za-z\s]+$',
+                message='Прізвище може містити тільки українські або латинські символи.'
+            )
+        ]
+    )
     email = models.CharField(max_length=100,
                              validators=[EmailValidator("@")],
                              error_messages={'invalid': 'Введіть дійсну адресу електронної пошти.'}
@@ -22,11 +35,11 @@ class Client(models.Model):
     phone_number = models.CharField(
         max_length=20,
         validators=[RegexValidator(r'^\+?\d{9,15}$', message='Введіть дійсний номер телефону.')],
-        help_text='Формат: +380123456789',
+        help_text='Формат: 380123456789',
     )
 
     def __str__(self):
-        return f'{self.first_name}'
+        return f'Клієнт {self.first_name} {self.last_name}'
 
 
 class PizzaSize(models.Model):
@@ -47,7 +60,7 @@ class PizzaSize(models.Model):
         ('Класичне', 'Класичне'),
     ]
     crust_type = models.CharField(max_length=20, choices=CRUST_CHOICES)
-    price = models.FloatField()
+    price = models.FloatField(validators=[MinValueValidator(0)])
 
     def __str__(self):
         return f'Розмір піци {self.size_type}'
@@ -60,7 +73,15 @@ class Pizza(models.Model):
         (600, '600'),
         (800, '800'),
     ]
-    name = models.CharField(max_length=50)
+    name = models.CharField(
+        max_length=50,
+        validators=[
+            RegexValidator(
+                r'^[А-ЯІЇЄа-яіїєA-Za-z\s]+$',
+                message='Назва піци може містити тільки українські або латинські символи та пробіли.'
+            )
+        ]
+    )
     weight = models.IntegerField(choices=WEIGHT_CHOICES)
     description = models.CharField(max_length=200)
     size_pizza = models.ForeignKey('PizzaSize', on_delete=models.CASCADE, related_name='size_pizza',
@@ -93,9 +114,8 @@ class Order(models.Model):
     delivery_address = models.CharField(max_length=200)
     amount = models.FloatField(default=0)
 
-
     def __str__(self):
-        return f'Замовлення {self.id}'
+        return f'Замовлення {self.delivery_address}'
 
     def save(self, *args, **kwargs):
         price = self.pizza_order.size_pizza.price
@@ -106,43 +126,111 @@ class Order(models.Model):
 
 
 class Payment(models.Model):
-    payment_type = models.CharField(max_length=20)
-    payment_date = models.DateField()
-    payment_time = models.TimeField()
+    PAYMENT_CHOICES = (
+        ('Готівкою', 'Готівкою'),
+        ('Карткою', 'Карткою'),
+    )
+
+    payment_type = models.CharField(max_length=20, choices=PAYMENT_CHOICES)
+    payment_date = models.DateField(validators=[validate_past_or_today])
+    payment_time = models.TimeField(validators=[validate_past_or_current_time])
     promo_payment = models.ForeignKey('Promo', on_delete=models.CASCADE, related_name='promo_payment', null=True,
                                       blank=True)
 
     def __str__(self):
-        return f'Оплата {self.id}'
+        return f'Оплата {self.payment_type}'
 
 
 class Courier(models.Model):
-    first_name = models.CharField(max_length=50)
-    last_name = models.CharField(max_length=50)
-    email = models.CharField(max_length=100)
-    phone_number = models.CharField(max_length=20)
-    delivery_count = models.IntegerField()
-    experience = models.IntegerField()
+    first_name = models.CharField(
+        max_length=50,
+        validators=[
+            RegexValidator(
+                r'^[А-ЯІЇЄа-яіїєA-Za-z\s]+$',
+                message='Ім\'я може містити тільки українські або латинські символи.'
+            )
+        ]
+    )
+    last_name = models.CharField(
+        max_length=50,
+        validators=[
+            RegexValidator(
+                r'^[А-ЯІЇЄа-яіїєA-Za-z\s]+$',
+                message='Прізвище може містити тільки українські або латинські символи.'
+            )
+        ]
+    )
+    email = models.CharField(max_length=100,
+                             validators=[EmailValidator("@")],
+                             error_messages={'invalid': 'Введіть дійсну адресу електронної пошти.'}
+                             )
+    phone_number = models.CharField(
+        max_length=20,
+        validators=[RegexValidator(r'^\+?\d{9,15}$', message='Введіть дійсний номер телефону.')],
+        help_text='Формат: 380123456789',
+    )
+    delivery_count = models.IntegerField(validators=[
+        MinValueValidator(0, message='Кількість доставок не може бути менше 0.')
+    ])
+    experience = models.IntegerField(
+        validators=[
+            MinValueValidator(0, message='Досвід не може бути менше 0.'),
+            MaxValueValidator(7, message='Досвід не може бути більше 7.')
+        ]
+    )
 
     def __str__(self):
-        return f'Курєр {self.id}'
+        return f'Курєр {self.first_name} {self.last_name}'
 
 
 class Chef(models.Model):
-    first_name = models.CharField(max_length=50)
-    last_name = models.CharField(max_length=50)
-    salary = models.FloatField()
-    experience = models.IntegerField()
-    position = models.CharField(max_length=50)
-    phone_number = models.CharField(max_length=20)
+    POSITION_CHOICES = [
+        ('Шеф-кухар', 'Шеф-кухар'),
+        ('Другий кухар', 'Другий кухар'),
+        ('Третій кухар', 'Третій кухар'),
+        ('Помічник кухаря', 'Помічник кухаря'),
+        ('Мастер-кухар', 'Мастер-кухар'),
+    ]
+
+    first_name = models.CharField(
+        max_length=50,
+        validators=[
+            RegexValidator(
+                r'^[А-ЯІЇЄа-яіїєA-Za-z\s]+$',
+                message='Ім\'я може містити тільки українські або латинські символи.'
+            )
+        ]
+    )
+    last_name = models.CharField(
+        max_length=50,
+        validators=[
+            RegexValidator(
+                r'^[А-ЯІЇЄа-яіїєA-Za-z\s]+$',
+                message='Прізвище може містити тільки українські або латинські символи.'
+            )
+        ]
+    )
+    salary = models.FloatField(validators=[MinValueValidator(0, message='Зарплата не може бути менше 0.')])
+    experience = models.IntegerField(
+        validators=[
+            MinValueValidator(0, message='Досвід не може бути менше 0.'),
+            MaxValueValidator(7, message='Досвід не може бути більше 7.')
+        ]
+    )
+    position = models.CharField(max_length=50, choices=POSITION_CHOICES)
+    phone_number = models.CharField(
+        max_length=20,
+        validators=[RegexValidator(r'^\+?\d{9,15}$', message='Введіть дійсний номер телефону.')],
+        help_text='Формат: 380123456789',
+    )
 
     def __str__(self):
-        return f'Шеф {self.id}'
+        return f'Шеф {self.first_name} {self.last_name}'
 
 
 class Delivery(models.Model):
-    delivery_date = models.DateField()
-    delivery_time = models.TimeField()
+    delivery_date = models.DateField(validators=[validate_past_or_today])
+    delivery_time = models.TimeField(validators=[validate_past_or_current_time])
     delivery_comment = models.CharField(max_length=200)
     payment_delivery = models.ForeignKey('Payment', on_delete=models.CASCADE, related_name='payment_delivery',
                                          null=True, blank=True)
@@ -153,9 +241,11 @@ class Delivery(models.Model):
 
 class Feedback(models.Model):
     feedback_text = models.CharField(max_length=200)
-    rating = models.IntegerField(validators=[MaxValueValidator(5)])
-    feedback_date = models.DateField()
-    feedback_time = models.TimeField()
+    rating = models.IntegerField(validators=[
+        MinValueValidator(1, message='Мінімальна оцінка 1.'),
+        MaxValueValidator(5, message='Максимальна оцінка 5.')])
+    feedback_date = models.DateField(validators=[validate_past_or_today])
+    feedback_time = models.TimeField(validators=[validate_past_or_current_time])
     client_feedback = models.ForeignKey('Client', on_delete=models.CASCADE, related_name='client_feedback', null=True,
                                         blank=True)
 
@@ -165,13 +255,14 @@ class Feedback(models.Model):
 
 class Promo(models.Model):
     promo_name = models.CharField(max_length=50)
-    discount = models.FloatField()
+    discount = models.FloatField(
+        validators=[MinValueValidator(0, message='Знижка повинна бути більше або дорівнювати 0.')])
     valid_term = models.IntegerField(default=1)
     promo_date = models.ForeignKey('PromoDate', on_delete=models.CASCADE, related_name='promo_date', null=True,
                                    blank=True)
 
     def __str__(self):
-        return f'Промокод {self.id}'
+        return f'Промокод {self.promo_name}'
 
     def save(self, *args, **kwargs):
         end = datetime.strptime(str(self.promo_date.end_date), "%Y-%m-%d")
