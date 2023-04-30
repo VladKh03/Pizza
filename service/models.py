@@ -1,25 +1,52 @@
 # Create your models here.
-from datetime import datetime
+from datetime import datetime, timezone
 
-from django.core.validators import MaxValueValidator
+from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, EmailValidator, RegexValidator
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.forms import TextInput
+from timezone_field import TimeZoneField
+
+from service.tasks import validate_past_or_today, validate_past_or_current_time
 
 
 class Client(models.Model):
     first_name = models.CharField(max_length=50)
     last_name = models.CharField(max_length=50)
-    email = models.CharField(max_length=100)
-    phone_number = models.CharField(max_length=20)
+    email = models.CharField(max_length=100,
+                             validators=[EmailValidator("@")],
+                             error_messages={'invalid': 'Введіть дійсну адресу електронної пошти.'}
+                             )
+    phone_number = models.CharField(
+        max_length=20,
+        validators=[RegexValidator(r'^\+?\d{9,15}$', message='Введіть дійсний номер телефону.')],
+        help_text='Формат: +380123456789',
+    )
 
     def __str__(self):
         return f'{self.first_name}'
 
 
 class PizzaSize(models.Model):
-    size_type = models.CharField(max_length=20)
-    crust_type = models.CharField(max_length=20)
+    SIZE_CHOICES = [
+        ('25', '25'),
+        ('30', '30'),
+        ('35', '35'),
+        ('40', '40'),
+    ]
+    size_type = models.CharField(max_length=20, choices=SIZE_CHOICES)
+    CRUST_CHOICES = [
+        ('Тонке', 'Тонке'),
+        ('Пухке', 'Пухке'),
+        ('Нью-йоркське', 'Нью-йоркське'),
+        ('Чікагське', 'Чікагське'),
+        ('Сицилійське', 'Сицилійське'),
+        ('Наполеон', 'Наполеон'),
+        ('Класичне', 'Класичне'),
+    ]
+    crust_type = models.CharField(max_length=20, choices=CRUST_CHOICES)
     price = models.FloatField()
 
     def __str__(self):
@@ -27,8 +54,14 @@ class PizzaSize(models.Model):
 
 
 class Pizza(models.Model):
+    WEIGHT_CHOICES = [
+        (400, '400'),
+        (500, '500'),
+        (600, '600'),
+        (800, '800'),
+    ]
     name = models.CharField(max_length=50)
-    weight = models.IntegerField()
+    weight = models.IntegerField(choices=WEIGHT_CHOICES)
     description = models.CharField(max_length=200)
     size_pizza = models.ForeignKey('PizzaSize', on_delete=models.CASCADE, related_name='size_pizza',
                                    null=True,
@@ -55,10 +88,11 @@ class Order(models.Model):
                                     null=True, blank=True)
     chef_order = models.ForeignKey('Chef', on_delete=models.CASCADE, related_name='chef_order',
                                    null=True, blank=True)
-    order_date = models.DateField()
-    order_time = models.TimeField()
+    order_date = models.DateField(validators=[validate_past_or_today])
+    order_time = models.TimeField(validators=[validate_past_or_current_time])
     delivery_address = models.CharField(max_length=200)
     amount = models.FloatField(default=0)
+
 
     def __str__(self):
         return f'Замовлення {self.id}'
@@ -165,6 +199,7 @@ class PromoDate(models.Model):
                 duration = self.end_date - self.start_date
                 promos.update(valid_term=max(duration.days, 1))
                 break
+
 
 @receiver(post_save, sender=PromoDate)
 def update_valid_term(sender, instance, **kwargs):
