@@ -1,11 +1,12 @@
 # Create your models here.
-from datetime import datetime
+from datetime import datetime, date
 
+from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, EmailValidator, RegexValidator, MinValueValidator
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-
+from django.utils import timezone
 from service.tasks import validate_past_or_today, validate_past_or_current_time
 
 
@@ -92,37 +93,6 @@ class Pizza(models.Model):
         return f'Піца {self.name}'
 
 
-class Order(models.Model):
-    client_order = models.ForeignKey('Client', on_delete=models.CASCADE, related_name='client_order',
-                                     null=True, blank=True)
-    courier_order = models.ForeignKey('Courier', on_delete=models.CASCADE, related_name='courier_order',
-                                      null=True, blank=True)
-    payment_order = models.ForeignKey('Payment', on_delete=models.CASCADE, related_name='payment_order',
-                                      null=True, blank=True)
-    delivery_order = models.ForeignKey('Delivery', on_delete=models.CASCADE, related_name='delivery_order',
-                                       null=True, blank=True)
-    feedback_order = models.ForeignKey('Feedback', on_delete=models.CASCADE, related_name='feedback_order',
-                                       null=True, blank=True)
-    promo_order = models.ForeignKey('Promo', on_delete=models.CASCADE, related_name='promo_order',
-                                    null=True, blank=True)
-    pizza_order = models.ForeignKey('Pizza', on_delete=models.CASCADE, related_name='pizza_order',
-                                    null=True, blank=True)
-    chef_order = models.ForeignKey('Chef', on_delete=models.CASCADE, related_name='chef_order',
-                                   null=True, blank=True)
-    order_date = models.DateField(validators=[validate_past_or_today])
-    order_time = models.TimeField(validators=[validate_past_or_current_time])
-    delivery_address = models.CharField(max_length=200)
-    amount = models.FloatField(default=0)
-
-    def __str__(self):
-        return f'Замовлення {self.delivery_address}'
-
-    def save(self, *args, **kwargs):
-        price = self.pizza_order.size_pizza.price
-        promo = self.promo_order.discount
-
-        self.amount = price - promo
-        return super().save(*args, **kwargs)
 
 
 class Payment(models.Model):
@@ -281,15 +251,23 @@ class PromoDate(models.Model):
         return f'Номер промокоду {self.id}'
 
     def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        promo_list = list(self.promo_date.all().values_list('id', flat=True))
-        for promo_id in promo_list:
-            order = Order.objects.filter(promo_order_id=promo_id)
-            if not order.exists():
-                promos = Promo.objects.filter(promo_date=self)
-                duration = self.end_date - self.start_date
-                promos.update(valid_term=max(duration.days, 1))
-                break
+        try:
+            promo_list = list(self.promo_date.all().values_list('id', flat=True))
+            if len(promo_list) == 0:
+                super().save(*args, **kwargs)
+            for promo_id in promo_list:
+                order = Order.objects.filter(promo_order_id=promo_id)
+                if order.exists():
+                    break
+                else:
+                    promos = Promo.objects.filter(promo_date=self)
+                    duration = self.end_date - self.start_date
+                    promos.update(valid_term=max(duration.days, 1))
+                    super().save(*args, **kwargs)
+                    break
+        except:
+            print("pop")
+            super().save(*args, **kwargs)
 
 
 @receiver(post_save, sender=PromoDate)
@@ -305,3 +283,40 @@ def update_valid_term(sender, instance, **kwargs):
                 duration = instance.end_date - instance.start_date
                 promo.valid_term = duration.days
                 promo.save()
+
+
+class Order(models.Model):
+
+    client_order = models.ForeignKey('Client', on_delete=models.CASCADE, related_name='client_order',
+                                     null=True, blank=True, verbose_name = "Клієнт")
+    courier_order = models.ForeignKey('Courier', on_delete=models.CASCADE, related_name='courier_order',
+                                      null=True, blank=True)
+    payment_order = models.ForeignKey('Payment', on_delete=models.CASCADE, related_name='payment_order',
+                                      null=True, blank=True)
+    delivery_order = models.ForeignKey('Delivery', on_delete=models.CASCADE, related_name='delivery_order',
+                                       null=True, blank=True)
+    feedback_order = models.ForeignKey('Feedback', on_delete=models.CASCADE, related_name='feedback_order',
+                                       null=True, blank=True)
+    promo_order = models.ForeignKey('Promo', on_delete=models.CASCADE, related_name='promo_order',
+                                    null=True, blank=True)
+    pizza_order = models.ForeignKey('Pizza', on_delete=models.CASCADE, related_name='pizza_order',
+                                    null=True, blank=True)
+    chef_order = models.ForeignKey('Chef', on_delete=models.CASCADE, related_name='chef_order',
+                                   null=True, blank=True)
+    order_date = models.DateField(validators=[validate_past_or_today])
+    order_time = models.TimeField(validators=[validate_past_or_current_time])
+    delivery_address = models.CharField(max_length=200)
+    amount = models.FloatField(default=0)
+
+
+    def __str__(self):
+        return f'Замовлення {self.delivery_address}'
+
+    def save(self, *args, **kwargs):
+        price = self.pizza_order.size_pizza.price
+        promo = self.promo_order.discount
+
+        self.amount = price - promo
+        return super().save(*args, **kwargs)
+
+
