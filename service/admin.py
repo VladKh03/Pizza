@@ -15,10 +15,10 @@ class ClientAdmin(admin.ModelAdmin):
 @admin.register(Pizza)
 class PizzaAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'weight', 'description', 'size_pizza')
-    list_filter = ('id', 'name', 'weight', 'description', 'size_pizza__id')
-    search_fields = ('id', 'name', 'weight', 'description', 'size_pizza__id')
+    list_filter = ('id', 'name', 'weight', 'description', 'size_pizza__size_type')
+    search_fields = ('id', 'name', 'weight', 'description', 'size_pizza__size_type')
     fields = ('name', 'weight', 'description', 'size_pizza')
-    ordering = ('id', 'name', 'weight', 'description', 'size_pizza__id')
+    ordering = ('id', 'name', 'weight', 'description', 'size_pizza__size_type')
 
 
 @admin.register(PizzaSize)
@@ -60,14 +60,14 @@ class ChefAdmin(admin.ModelAdmin):
 @admin.register(Delivery)
 class DeliveryAdmin(admin.ModelAdmin):
     list_display = (
-        'id', 'delivery_date', 'delivery_time', 'payment_delivery', 'delivery_comment')
-    list_filter = ('id', 'delivery_date', 'delivery_time', 'payment_delivery__id',
+        'id', 'delivery_date', 'delivery_time', 'delivery_comment')
+    list_filter = ('id', 'delivery_date', 'delivery_time',
                    'delivery_comment')
     search_fields = (
-        'id', 'delivery_date', 'delivery_time', 'payment_delivery__id',
+        'id', 'delivery_date', 'delivery_time',
         'delivery_comment')
-    fields = ('delivery_date', 'delivery_time', 'payment_delivery', 'delivery_comment')
-    ordering = ('id', 'delivery_date', 'delivery_time', 'payment_delivery__id',
+    fields = ('delivery_date', 'delivery_time', 'delivery_comment')
+    ordering = ('id', 'delivery_date', 'delivery_time',
                 'delivery_comment')
 
 
@@ -75,21 +75,21 @@ class DeliveryAdmin(admin.ModelAdmin):
 class FeedbackAdmin(admin.ModelAdmin):
     list_display = ('id', 'rating', 'feedback_date', 'feedback_time', 'client_feedback', 'feedback_text')
     list_filter = (
-        'id', 'rating', 'feedback_date', 'feedback_time', 'client_feedback__id', 'feedback_text')
+        'id', 'rating', 'feedback_date', 'feedback_time', 'client_feedback__last_name', 'feedback_text')
     search_fields = (
-        'id', 'rating', 'feedback_date', 'feedback_time', 'client_feedback__id', 'feedback_text')
+        'id', 'rating', 'feedback_date', 'feedback_time', 'client_feedback__last_name', 'feedback_text')
     fields = ('rating', 'feedback_date', 'feedback_time', 'client_feedback', 'feedback_text')
     ordering = (
-        'id', 'rating', 'feedback_date', 'feedback_time', 'client_feedback__id', 'feedback_text')
+        'id', 'rating', 'feedback_date', 'feedback_time', 'client_feedback__last_name', 'feedback_text')
 
 
 @admin.register(Promo)
 class PromoAdmin(admin.ModelAdmin):
     list_display = ('id', 'promo_name', 'discount', 'valid_term', 'promo_date')
-    list_filter = ('id', 'promo_name', 'discount', 'valid_term', 'promo_date__id')
-    search_fields = ('id', 'promo_name', 'discount', 'valid_term', 'promo_date__id')
+    list_filter = ('id', 'promo_name', 'discount', 'valid_term', 'promo_date__discount_type')
+    search_fields = ('id', 'promo_name', 'discount', 'valid_term', 'promo_date__discount_type')
     fields = ('promo_name', 'discount', 'promo_date')
-    ordering = ('id', 'promo_name', 'discount', 'valid_term', 'promo_date__id')
+    ordering = ('id', 'promo_name', 'discount', 'valid_term', 'promo_date__discount_type')
 
 
 @admin.register(PromoDate)
@@ -106,15 +106,15 @@ class OrderAdmin(admin.ModelAdmin):
     list_display = (
         'id', 'client_order', 'payment_order', 'delivery_order', 'feedback_order', 'promo_order', 'pizza_order',
         'chef_order', 'order_date', 'order_time', 'delivery_address', 'amount')
-    list_filter = ('id', 'client_order__id', 'payment_order__id', 'delivery_order__id',
-                   'feedback_order__id', 'promo_order__id', 'pizza_order__id',
-                   'chef_order__id', 'order_date', 'order_time', 'delivery_address', 'amount')
-    search_fields = ('id', 'client_order__first_name', 'payment_order__id', 'delivery_order__id',
-                     'feedback_order__id', 'promo_order__id', 'pizza_order__id',
-                     'chef_order__id', 'order_date', 'order_time', 'delivery_address', 'amount')
+    list_filter = ('id', 'client_order__last_name', 'payment_order__payment_type', 'delivery_order__id',
+                   'feedback_order__rating', 'promo_order__promo_name', 'pizza_order__name',
+                   'chef_order__last_name', 'order_date', 'order_time', 'delivery_address', 'amount')
+    search_fields = ('id', 'client_order__last_name', 'payment_order__payment_type', 'delivery_order__id',
+                     'feedback_order__rating', 'promo_order__promo_name', 'pizza_order__name',
+                     'chef_order__last_name', 'order_date', 'order_time', 'delivery_address', 'amount')
     fields = (
         'client_order', 'payment_order', 'delivery_order', 'feedback_order', 'promo_order', 'pizza_order', 'chef_order',
         'order_date', 'order_time', 'delivery_address')
-    ordering = ('id', 'client_order__id', 'payment_order__id', 'delivery_order__id',
-                'feedback_order__id', 'promo_order__id', 'pizza_order__id', 'chef_order__id',
-                'order_date', 'order_time', 'delivery_address', 'amount')
+    ordering = ('id', 'client_order__last_name', 'payment_order__payment_type', 'delivery_order__id',
+                'feedback_order__rating', 'promo_order__promo_name', 'pizza_order__name',
+                'chef_order__last_name', 'order_date', 'order_time', 'delivery_address', 'amount')
