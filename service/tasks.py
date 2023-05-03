@@ -12,7 +12,7 @@ def validate_past_or_today(value):
 def validate_past_or_current_time(value):
     current_time = datetime.now().time()
     value_str = value.strftime('%H:%M:%S')
-    value_time = (datetime.strptime(value_str, '%H:%M:%S') + timedelta(hours=3)).time()
+    value_time = (datetime.strptime(value_str, '%H:%M:%S')).time()
 
 
     if value_time > current_time:
