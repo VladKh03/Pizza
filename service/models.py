@@ -5,7 +5,7 @@ from django.core.validators import MaxValueValidator, EmailValidator, RegexValid
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-
+from django.contrib import messages
 from service.tasks import validate_past_or_today, validate_past_or_current_time
 
 
@@ -39,7 +39,8 @@ class Client(models.Model):
         help_text='Формат: 380123456789',
         verbose_name = "Номер телефону клієнта"
     )
-
+    client_order = models.ForeignKey('Order', on_delete=models.CASCADE, related_name='client_order',
+                                     null=True, blank=True, verbose_name="Замовлення")
     def __str__(self):
         return f'{self.first_name} {self.last_name}'
 
@@ -90,6 +91,8 @@ class Pizza(models.Model):
                                    null=True,
                                    blank=True,
                                    verbose_name = "Розмір піци")
+    pizza_chef = models.ForeignKey('Chef', on_delete=models.CASCADE, related_name='pizza_chef',
+                                    null=True, blank=True, verbose_name="Кухар")
 
     def __str__(self):
         return f'{self.name}'
@@ -106,11 +109,11 @@ class Payment(models.Model):
     payment_type = models.CharField(max_length=20, choices=PAYMENT_CHOICES, verbose_name = "Тип оплати")
     payment_date = models.DateField(validators=[validate_past_or_today], verbose_name = "Дата оплати")
     payment_time = models.TimeField(validators=[validate_past_or_current_time], verbose_name = "Час оплати")
-    promo_payment = models.ForeignKey('Promo', on_delete=models.CASCADE, related_name='promo_payment', null=True,
+    promo_payment = models.OneToOneField('Promo', on_delete=models.CASCADE, related_name='promo_payment', null=True,
                                       blank=True, verbose_name = "Промокод")
 
     def __str__(self):
-        return f'Оплата {self.payment_type}'
+        return f'Оплата №{self.id}'
 
 
 class Courier(models.Model):
@@ -152,6 +155,8 @@ class Courier(models.Model):
             MaxValueValidator(7, message='Досвід не може бути більше 7.')
         ], verbose_name = "Стаж роботи курєра"
     )
+    delivery_courier = models.ForeignKey('Delivery', on_delete=models.CASCADE, related_name='delivery_courier',
+                                       null=True, blank=True, verbose_name="Доставка")
 
     def __str__(self):
         return f'Курєр {self.first_name} {self.last_name}'
@@ -198,16 +203,19 @@ class Chef(models.Model):
         help_text='Формат: 380123456789',
         verbose_name = "Номер телефону"
     )
+    chef_order = models.ForeignKey('Order', on_delete=models.CASCADE, related_name='chef_order',
+                                   null=True, blank=True, verbose_name="Замовлення")
 
     def __str__(self):
-        return f'Шеф {self.first_name} {self.last_name}'
+        return f'Кухар {self.first_name} {self.last_name}'
 
 
 class Delivery(models.Model):
     delivery_date = models.DateField(validators=[validate_past_or_today], verbose_name = "Дата доставки")
     delivery_time = models.TimeField(validators=[validate_past_or_current_time], verbose_name = "Час доставки")
     delivery_comment = models.CharField(max_length=200, verbose_name = "Коментар до доставки")
-
+    payment_delivery = models.OneToOneField('Payment', on_delete=models.CASCADE, related_name='payment_delivery',
+                                      null=True, blank=True, verbose_name="Оплата")
 
     def __str__(self):
         return f'Доставка {self.id}'
@@ -234,6 +242,9 @@ class Promo(models.Model):
     valid_term = models.IntegerField(default=1, verbose_name = "Термін дії промокода")
     promo_date = models.ForeignKey('PromoDate', on_delete=models.CASCADE, related_name='promo_date', null=True,
                                    blank=True, verbose_name = "Тип промокода")
+    promo_order = models.OneToOneField('Order', on_delete=models.CASCADE, related_name='promo_order',
+                                       null=True, blank=True, verbose_name="Замовлення")
+
 
     def __str__(self):
         return f'Промокод {self.promo_name}'
@@ -262,12 +273,9 @@ class PromoDate(models.Model):
 
     def save(self, *args, **kwargs):
         try:
-            promo_list = list(self.promo_date.all().values_list('id', flat=True))
-            if len(promo_list) == 0:
-                super().save(*args, **kwargs)
-            for promo_id in promo_list:
-                order = Order.objects.filter(promo_order_id=promo_id)
-                if order.exists():
+            promo_list = list(self.promo_date.all())
+            for i in promo_list:
+                if (i.promo_order):
                     break
                 else:
                     promos = Promo.objects.filter(promo_date=self)
@@ -275,18 +283,17 @@ class PromoDate(models.Model):
                     promos.update(valid_term=max(duration.days, 1))
                     super().save(*args, **kwargs)
                     break
+
         except:
-            print("pop")
             super().save(*args, **kwargs)
 
 
 @receiver(post_save, sender=PromoDate)
 def update_valid_term(sender, instance, **kwargs):
-    promo_list = list(Promo.objects.filter(promo_date=instance).values_list('id', flat=True))
-    for promo_id in promo_list:
-        order = (Order.objects.filter(promo_order=promo_id))
-        if order.first():
-            pass
+    promo_list = list(Promo.objects.filter(promo_date=instance))
+    for i in promo_list:
+        if(i.promo_order):
+            break
         else:
             promos = Promo.objects.filter(promo_date=instance)
             for promo in promos:
@@ -296,23 +303,8 @@ def update_valid_term(sender, instance, **kwargs):
 
 
 class Order(models.Model):
-
-    client_order = models.ForeignKey('Client', on_delete=models.CASCADE, related_name='client_order',
-                                     null=True, blank=True, verbose_name = "Клієнт")
     courier_order = models.ForeignKey('Courier', on_delete=models.CASCADE, related_name='courier_order',
                                       null=True, blank=True, verbose_name = "Курєр")
-    payment_order = models.ForeignKey('Payment', on_delete=models.CASCADE, related_name='payment_order',
-                                      null=True, blank=True, verbose_name = "Оплата")
-    delivery_order = models.ForeignKey('Delivery', on_delete=models.CASCADE, related_name='delivery_order',
-                                       null=True, blank=True, verbose_name = "Доставка")
-    feedback_order = models.ForeignKey('Feedback', on_delete=models.CASCADE, related_name='feedback_order',
-                                       null=True, blank=True, verbose_name = "Відгук")
-    promo_order = models.ForeignKey('Promo', on_delete=models.CASCADE, related_name='promo_order',
-                                    null=True, blank=True, verbose_name = "Промокод")
-    pizza_order = models.ForeignKey('Pizza', on_delete=models.CASCADE, related_name='pizza_order',
-                                    null=True, blank=True, verbose_name = "Піца")
-    chef_order = models.ForeignKey('Chef', on_delete=models.CASCADE, related_name='chef_order',
-                                   null=True, blank=True, verbose_name = "Шеф")
     order_date = models.DateField(validators=[validate_past_or_today], verbose_name = "Дата замовлення")
     order_time = models.TimeField(validators=[validate_past_or_current_time], verbose_name = "Час замовлення")
     delivery_address = models.CharField(max_length=200, verbose_name = "Адреса замовлення")
@@ -320,13 +312,21 @@ class Order(models.Model):
 
 
     def __str__(self):
-        return f'Замовлення {self.delivery_address}'
+        return f'Замовлення {self.id} {self.delivery_address}'
 
     def save(self, *args, **kwargs):
-        price = self.pizza_order.size_pizza.price
-        promo = self.promo_order.discount
-
-        self.amount = price - promo
-        return super().save(*args, **kwargs)
+        try:
+            res = 0
+            promo = (Promo.objects.filter(promo_order=self.id).first())
+            pizzas = (Pizza.objects.filter(pizza_order=self.id))
+            for pizza in pizzas:
+                prices = (PizzaSize.objects.filter(size_pizza=pizza.id))
+                for price in prices:
+                    res += price.price
+            self.amount = res - promo.discount
+            return super().save(*args, **kwargs)
+        except:
+            self.amount = 0
+            return super().save(*args, **kwargs)
 
 
