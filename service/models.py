@@ -283,7 +283,6 @@ class PromoDate(models.Model):
                     promos.update(valid_term=max(duration.days, 1))
                     super().save(*args, **kwargs)
                     break
-
         except:
             super().save(*args, **kwargs)
 
