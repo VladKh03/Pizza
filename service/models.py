@@ -5,7 +5,6 @@ from django.core.validators import MaxValueValidator, EmailValidator, RegexValid
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.contrib import messages
 from service.tasks import validate_past_or_today, validate_past_or_current_time
 
 
