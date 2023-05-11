@@ -2,17 +2,79 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <title>My Website</title>
 </head>
+<style>
+    nav ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    nav a {
+        width: 500px;
+        display: inline-block;
+        padding: 10px;
+        text-decoration: none;
+        color: #333;
+        font-size: 25px;
+        border-bottom: 1px solid #000;
+    }
+
+    nav a:hover {
+      background-color: #333;
+      color: #fff;
+    }
+    .cont{
+        display: flex;
+        justify-content: center;
+        margin-top: 100px;
+    }
+    nav {
+        border: 1px solid #000;
+        border-radius: 5px;
+        background-color: whitesmoke;
+    }
+    body {
+      background-image: url('https://cdn.shopify.com/s/files/1/0249/6561/1568/articles/pizza_delivery_in_the_US.jpg?v=1630572628');
+      background-size: cover;
+      background-position: center;
+      margin: 0;
+    }
+    header {
+        background-color: darkblue;
+        color: #fff;
+        padding: 10px 20px;
+    }
+
+    header a {
+      text-decoration: none;
+      color: #fff;
+      font-size: 32px;
+      font-weight: bold;
+      transition: all 0.2s ease-in-out;
+    }
+
+</style>
+<header>
+    <a href="{% url 'index' %}">На головну</a>
+    <a style="margin-left: 20px" href="/admin/service/">Робота з даними</a>
+</header>
 <body>
-    <a href="{% url 'first' %}">First</a>
-    <a href="{% url 'second' %}">Second</a>
-    <a href="{% url 'third' %}">Third</a>
-    <a href="{% url 'fourth' %}">Fourth</a>
-    <a href="{% url 'fifth' %}">Fifth</a>
-    <a href="{% url 'sixth' %}">Sixth</a>
-    <a href="{% url 'seventh' %}">Seventh</a>
-    <a href="{% url 'eighth' %}">Eighth</a>
-    <a href="{% url 'ninth' %}">Ninth</a>
+    <div class="cont">
+        <nav>
+            <ul>
+                <li><a href="{% url 'first' %}">Клієнт</a></li>
+                <li><a href="{% url 'second' %}">Замовлення</a></li>
+                <li><a href="{% url 'third' %}">Піца</a></li>
+                <li><a href="{% url 'fourth' %}">Оплата</a></li>
+                <li><a href="{% url 'fifth' %}">Курєр</a></li>
+                <li><a href="{% url 'sixth' %}">Кухар</a></li>
+                <li><a href="{% url 'seventh' %}">Доставка</a></li>
+                <li><a href="{% url 'eighth' %}">Відгук</a></li>
+                <li class="last"><a href="{% url 'ninth' %}">Промокод</a></li>
+            </ul>
+        </nav>
+    </div>
 </body>
 </html>
