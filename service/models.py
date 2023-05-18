@@ -308,21 +308,23 @@ class Order(models.Model):
     delivery_address = models.CharField(max_length=200, verbose_name = "Адреса замовлення")
     amount = models.FloatField(default=0, verbose_name = "Сума замовлення")
 
-
     def __str__(self):
         return f'Замовлення {self.id} {self.delivery_address}'
 
     def save(self, *args, **kwargs):
+        print("HERE")
         try:
             res = 0
             promo = (Promo.objects.filter(promo_order=self.id).first())
-            pizzas = (Pizza.objects.filter(pizza_order=self.id))
+            chef = (Chef.objects.filter(chef_order=self.id)).first()
+            pizzas = (Pizza.objects.filter(pizza_chef=chef.id))
             for pizza in pizzas:
                 prices = (PizzaSize.objects.filter(size_pizza=pizza.id))
                 for price in prices:
                     res += price.price
             self.amount = res - promo.discount
             return super().save(*args, **kwargs)
+
         except:
             self.amount = 0
             return super().save(*args, **kwargs)
